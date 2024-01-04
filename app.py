@@ -109,6 +109,15 @@ def custom_std(series):
     # Return 0 if there's only one data point, else calculate std
     return series.std() if len(series) > 1 else 0
 
+def count_trips(df, carrier):
+    return len(df[df["Carrier"] == carrier])
+
+def count_unique_routes(df, carrier):
+    
+    t = df.copy()
+    t["route"] = t["FromZIP"] + " " + t["ToZIP"]
+    return len(np.unique(t[t["Carrier"] == carrier]["route"].values))
+
 def TransportAnalysis(df):
     df = df.fillna('-')
     df = to_date(df)
@@ -117,12 +126,14 @@ def TransportAnalysis(df):
     
     # Convert 'Time Difference' to numeric and handle NaN values
     df['Time Difference'] = pd.to_numeric(df['Time Difference'], errors='coerce')
-
+    
+    df["Total Trips"] = df["Carrier"].apply(lambda x:count_trips(df, x))
+    df["Unique Routes"] = df["Carrier"].apply(lambda x:count_unique_routes(df, x))
     # Group the data
     grouped = df.groupby(['Carrier', 'FromZIP', 'ToZIP'])
 
     # Calculate the mean and std using custom std function
-    result = grouped.agg({'Final Amount': 'mean', 'Time Difference': ['mean', custom_std]})
+    result = grouped.agg({'Final Amount': ['mean', custom_std, "min", "max"], 'Time Difference': ['mean', custom_std], 'Total Trips': 'max', 'Unique Routes': 'max'})
     result.columns = [' '.join(col).strip() for col in result.columns.values]
     # Sort the result
     result = result.sort_values(by='Final Amount mean')
@@ -233,6 +244,7 @@ if selected == "Time Delay Analysis":
             st.text_area("Note", "Additional Insights About the data`", key="note", height=210)
         c1, c2= st.columns(2)
         c3, c4= st.columns(2)
+        c5, c6= st.columns(2)
 
         
         if 'carrier_data' not in st.session_state:
@@ -252,6 +264,14 @@ if selected == "Time Delay Analysis":
             with c4:
                 h4 = st.empty()
                 p4 = st.empty()
+            
+            with c5:
+                h5 = st.empty()
+                p5 = st.empty()
+            
+            with c6:
+                h6 = st.empty()
+                p6 = st.empty()
         else:   
             carrier_df = apply_filters(st.session_state.carrier_data)
             carrier_place = st.dataframe(carrier_df)
@@ -270,6 +290,14 @@ if selected == "Time Delay Analysis":
             with c4:
                 h4 = st.subheader("Final Amount mean")
                 p4 = st.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
+            
+            with c5:
+                h5 = st.subheader("Total Trips")
+                p5 = st.bar_chart(data=carrier_df, y="Total Trips max" , x="Carrier")
+            
+            with c6:
+                h6 = st.subheader("Unique Routes")
+                p6 = st.bar_chart(data=carrier_df, y="Unique Routes max" , x="Carrier")
             
         if st.button("Get Carriers", key="get_carriers"):
             if from_ and to and num:
@@ -294,6 +322,14 @@ if selected == "Time Delay Analysis":
                     with c4:
                         h4.subheader("Final Amount mean")
                         p4.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
+                    
+                    with c5:
+                        h5.subheader("Total Trips")
+                        p5.bar_chart(data=carrier_df, y="Total Trips max" , x="Carrier")
+                    
+                    with c6:
+                        h6.subheader("Unique Routes")
+                        p6.bar_chart(data=carrier_df, y="Unique Routes max" , x="Carrier")
             else:
                 st.warning("Please enter all fields", icon="⚠️")
 
