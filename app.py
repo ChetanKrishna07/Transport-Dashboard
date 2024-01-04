@@ -142,7 +142,10 @@ def get_carriers(FromZIP, ToZIP):
     final_data = TransportAnalysis(df)
     final_data = final_data[(final_data['FromZIP'] == FromZIP) & (final_data['ToZIP'] == ToZIP)].sort_values('Final Amount mean')
     final_data["No Delay Ratio"] = final_data["Carrier"].apply(lambda carrier : no_delay_ratio(final_data, carrier, FromZIP, ToZIP))
+    st.session_state.carrier_data = final_data.sort_values("No Delay Ratio", ascending=False)
     return final_data.sort_values("No Delay Ratio", ascending=False)
+
+
 # Getting Quotes
 
 def safe_literal_eval(s):
@@ -159,19 +162,48 @@ def create_quote_db():
     df["Quotes"] = df["Quotes"].apply(lambda x : safe_literal_eval(x) if not x is np.nan else dict())
     for idx, row in df.iterrows():
         for key in row["Quotes"].keys():
-            # append simmilar to above with all colums ['Link', 'Date', 'Job Number', 'Status', 'Shipment Mode', 'Carrier', 'Vehicle Count', 'Vehicle Type(s)', 'Pickup Location(s)', 'Pickup Address(es)', 'Delivery Location(s)', 'Delivery Address(es)','FromZIP', 'ToZIP', 'Final Amount', 'Quotes', 'Estimated Pickup Date','Adjusted Pickup', 'Estimated Delivery', 'Adjusted Delivery','Final Delivery', 'Seller', 'Buyer', 'Route']
+            
+            row["Quotes"][key] = pd.Series(row["Quotes"][key]).replace('[^\d.]', '', regex=True).values[0]
+            row["Quotes"][key] = int(row["Quotes"][key])
             quotes.append({
                 "FromZIP": row["FromZIP"],
                 "ToZIP": row["ToZIP"],
                 "Carrier": key,
                 "Qoute Amount": row["Quotes"][key],
             })
-    
+    st.session_state.quotes_data = pd.DataFrame(quotes)
     return pd.DataFrame(quotes)
 
-
 # UI 
+
+def apply_filters(df):
+    
+    if st.session_state.get("enable_filtering", False):
+        filtered_df = df.copy()
+        for column in df.columns:
+            if st.sidebar.checkbox(f"Enable {column} Filtering", key=f"enable_{column}_filtering"):
+                if is_numeric_dtype(df[column]):
+                    min_value, max_value = df[column].min(), df[column].max()
+                    start, end = st.sidebar.slider(f"{column} Range", min_value, max_value, (min_value, max_value))
+                    filtered_df = filtered_df[(filtered_df[column] >= start) & (filtered_df[column] <= end)]
+                elif is_object_dtype(df[column]):
+                    all_options = df[column].unique()
+                    if st.sidebar.checkbox("Select All", key=f"select_all_{column}"):
+                        default = all_options
+                    else:
+                        default = []
+                    options = st.sidebar.multiselect(f"Select {column}", all_options, default=default)
+                    filtered_df = filtered_df[filtered_df[column].isin(options)]  
+                    
+        return filtered_df
+    else:
+        return df
+
+
 st.set_page_config(page_title="Transport Analysis", page_icon="📄", layout="centered")
+
+if 'enable_filtering' not in st.session_state:
+    st.session_state.enable_filtering = False
 
 # Streamlit app layout
 with st.sidebar:
@@ -184,51 +216,81 @@ with st.sidebar:
     orientation = "horizontal",
 )
 
+st.sidebar.checkbox("Enable Filtering", key="enable_filtering")
+
 if selected == "Time Delay Analysis":
     st.title("Time Delay Analysis")
 
     try: 
         from_ = st.text_input("From ZIP", key="from", placeholder="Enter From ZIP")
         to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
-        
         num = st.text_input("Number of Carriers", key="num", placeholder="Enter Number of Carriers")
+        
+        c1, c2= st.columns(2)
+        c3, c4= st.columns(2)
 
-        flag = to and from_ and num
-
+        
+        if 'carrier_data' not in st.session_state:
+            carrier_place = st.empty()
+            with c1:
+                h1 = st.empty()
+                p1 = st.empty()
+            
+            with c2:
+                h2 = st.empty()
+                p2 = st.empty()
+                
+            with c3:
+                h3 = st.empty()
+                p3 = st.empty()
+                
+            with c4:
+                h4 = st.empty()
+                p4 = st.empty()
+        else:   
+            carrier_df = apply_filters(st.session_state.carrier_data)
+            carrier_place = st.dataframe(carrier_df)
+            with c1:
+                h1 = st.subheader("No Delay Ratio")
+                p1 = st.bar_chart(data=carrier_df, y="No Delay Ratio" , x="Carrier")
+            
+            with c2:
+                h2 = st.subheader("Time Difference mean")
+                p2 = st.bar_chart(data=carrier_df, y="Time Difference mean" , x="Carrier")
+            
+            with c3:
+                h3 = st.subheader("Time Difference Standard Deviation")
+                p3 = st.bar_chart(data=carrier_df, y="Time Difference custom_std" , x="Carrier")
+            
+            with c4:
+                h4 = st.subheader("Final Amount mean")
+                p4 = st.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
+            
         if st.button("Get Carriers", key="get_carriers"):
-            with st.spinner('Getting Carriers...'):
-                if flag:
+            if from_ and to and num:
+                with st.spinner('Getting Carriers...'):
                     carriers = get_carriers(from_, to)
-                    carrier_df = carriers.head(int(num))
+                    carrier_df = apply_filters(carriers.head(int(num)))
                     st.success(f"{len(carrier_df)} Carriers Retrived", icon="✅")
-                    st.dataframe(carrier_df)
-                    c1, c2= st.columns(2)
-                    c3, c4= st.columns(2)
-
-                    with st.container():
-                        c1.subheader("No Delay Ratio")
-                        c2.subheader("Time Difference mean")
-
-                    with st.container():
-                        c3.subheader("Time Difference Standard Deviation")
-                        c4.subheader("Final Amount mean")
-                        
+                    carrier_place.dataframe(carrier_df)
+                    
                     with c1:
-                        st.bar_chart(data=carrier_df, y="No Delay Ratio" , x="Carrier")
+                        h1.subheader("No Delay Ratio")
+                        p1.bar_chart(data=carrier_df, y="No Delay Ratio" , x="Carrier")
                     
                     with c2:
-
-                        st.bar_chart(data=carrier_df, y="Time Difference mean" , x="Carrier")
+                        h2.subheader("Time Difference mean")
+                        p2.bar_chart(data=carrier_df, y="Time Difference mean" , x="Carrier")
                     
                     with c3:
-                        st.bar_chart(data=carrier_df, y="Time Difference custom_std" , x="Carrier")
+                        h3.subheader("Time Difference Standard Deviation")
+                        p3.bar_chart(data=carrier_df, y="Time Difference custom_std" , x="Carrier")
                     
                     with c4:
-                        st.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
-                 
-            
-                else:
-                    st.warning("Please enter all fields", icon="⚠️")
+                        h4.subheader("Final Amount mean")
+                        p4.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
+            else:
+                st.warning("Please enter all fields", icon="⚠️")
 
     except Exception as e:
         logger.error("Error occured while getting carriers")
@@ -238,9 +300,10 @@ if selected == "Time Delay Analysis":
 elif selected == "Quotes":
     st.title("All Quotes")
 
-    df_placeholder = st.warning("Data Loading", icon="ℹ")
-
-    df_quotes = create_quote_db()
-    df_placeholder.dataframe(df_quotes)
-
-
+    if "quotes_data" not in st.session_state:
+        df_placeholder = st.warning("Data Loading", icon="ℹ")
+        df_quotes = apply_filters(create_quote_db())
+        df_placeholder.dataframe(df_quotes)
+    else:
+        df_quotes = apply_filters(st.session_state.quotes_data)
+        df_placeholder = st.dataframe(df_quotes)
