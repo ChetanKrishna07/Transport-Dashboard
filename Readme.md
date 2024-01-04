@@ -2,7 +2,7 @@
 
 Displays a interactve dashboard for transport data
 
-## Running Instructions
+## Local Running Instructions
 
 To run the project, follow these steps:
 
@@ -10,3 +10,8 @@ To run the project, follow these steps:
 2. Navigate to the project root directory (Transport Dashboard).
 3. Run the following command:
 `source ./run.sh`
+
+## Streamlit url
+https://transportdashboard.streamlit.app
+
+
