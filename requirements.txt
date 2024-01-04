@@ -1,0 +1,14 @@
+gspread
+oauth2client
+imapclient
+pandas
+numpy
+tqdm
+azure-storage-blob
+gspread_dataframe
+pyvirtualdisplay
+streamlit
+streamlit_option_menu
+matplotlib
+seaborn
+```
