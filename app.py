@@ -19,8 +19,6 @@ from pandas.api.types import (
 )
 import streamlit_option_menu
 from streamlit_option_menu import option_menu
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 # Set up logging to console and logs.log
