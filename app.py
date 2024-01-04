@@ -188,8 +188,9 @@ if selected == "Time Delay Analysis":
     st.title("Time Delay Analysis")
 
     try: 
-        to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
         from_ = st.text_input("From ZIP", key="from", placeholder="Enter From ZIP")
+        to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
+        
         num = st.text_input("Number of Carriers", key="num", placeholder="Enter Number of Carriers")
 
         flag = to and from_ and num
@@ -197,7 +198,7 @@ if selected == "Time Delay Analysis":
         if st.button("Get Carriers", key="get_carriers"):
             with st.spinner('Getting Carriers...'):
                 if flag:
-                    carriers = get_carriers(to, from_)
+                    carriers = get_carriers(from_, to)
                     carrier_df = carriers.head(int(num))
                     st.success(f"{len(carrier_df)} Carriers Retrived", icon="✅")
                     st.dataframe(carrier_df)
