@@ -222,10 +222,15 @@ if selected == "Time Delay Analysis":
     st.title("Time Delay Analysis")
 
     try: 
-        from_ = st.text_input("From ZIP", key="from", placeholder="Enter From ZIP")
-        to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
-        num = st.text_input("Number of Carriers", key="num", placeholder="Enter Number of Carriers")
         
+        left, right = st.columns(2)
+        with left:
+            from_ = st.text_input("From ZIP", key="from", placeholder="Enter From ZIP")
+            to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
+            num = st.text_input("Number of Carriers", key="num", placeholder="Enter Number of Carriers")
+        with right:
+            # streamlit text box
+            st.text_area("Note", "Additional Insights About the data`", key="note", height=210)
         c1, c2= st.columns(2)
         c3, c4= st.columns(2)
 
@@ -299,11 +304,14 @@ if selected == "Time Delay Analysis":
 
 elif selected == "Quotes":
     st.title("All Quotes")
-
-    if "quotes_data" not in st.session_state:
-        df_placeholder = st.warning("Data Loading", icon="ℹ")
-        df_quotes = apply_filters(create_quote_db())
-        df_placeholder.dataframe(df_quotes)
-    else:
-        df_quotes = apply_filters(st.session_state.quotes_data)
-        df_placeholder = st.dataframe(df_quotes)
+    left, right = st.columns(2)
+    with left:
+        if "quotes_data" not in st.session_state:
+            df_placeholder = st.warning("Data Loading", icon="ℹ")
+            df_quotes = apply_filters(create_quote_db())
+            df_placeholder.dataframe(df_quotes)
+        else:
+            df_quotes = apply_filters(st.session_state.quotes_data)
+            df_placeholder = st.dataframe(df_quotes)
+    with right:
+        st.text_area("Note", "Additional Insights About the data`", key="note", height=210)
