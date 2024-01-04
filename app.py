@@ -28,14 +28,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh = logging.FileHandler('logs.log')
-fh.setLevel(logging.ERROR)
+fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
-
 
 
 def get_data():
@@ -74,10 +73,10 @@ def get_data():
         logger.error("Error occured while fetching data")
         logger.error(e)
         return None
-    
+       
 
 # Getting Recommendations
-
+    
 def convert_date_format(input_date):
     # Convert the input date string to a datetime object
     date_object = datetime.strptime(input_date, "%B %d, %Y")
@@ -146,7 +145,6 @@ def get_carriers(FromZIP, ToZIP):
     final_data = final_data[(final_data['FromZIP'] == FromZIP) & (final_data['ToZIP'] == ToZIP)].sort_values('Final Amount mean')
     final_data["No Delay Ratio"] = final_data["Carrier"].apply(lambda carrier : no_delay_ratio(final_data, carrier, FromZIP, ToZIP))
     return final_data.sort_values("No Delay Ratio", ascending=False)
-
 # Getting Quotes
 
 def safe_literal_eval(s):
@@ -175,103 +173,21 @@ def create_quote_db():
 
 
 # UI 
-
-def filter_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Adds a UI on top of a dataframe to let viewers filter columns
-
-    Args:
-        df (pd.DataFrame): Original dataframe
-
-    Returns:
-        pd.DataFrame: Filtered dataframe
-    """
-    modify = st.checkbox("Add filters")
-
-    if not modify:
-        return df
-
-    df = df.copy()
-
-    # Try to convert datetimes into a standard format (datetime, no timezone)
-    for col in df.columns:
-        if is_object_dtype(df[col]):
-            logger.info(f"Trying to convert {col} to datetime")
-            try:
-                df[col] = pd.to_datetime(df[col])
-            except Exception:
-                pass
-
-        if is_datetime64_any_dtype(df[col]):
-            logger.info(f"Trying to convert {col} to datetime")
-            df[col] = df[col].dt.tz_localize(None)
-
-    modification_container = st.container()
-
-    with modification_container:
-        to_filter_columns = st.multiselect("Filter dataframe on", df.columns)
-        for column in to_filter_columns:
-            left, right = st.columns((1, 20))
-            # Treat columns with < 10 unique values as categorical
-            if is_categorical_dtype(df[column]) or df[column].nunique() < 10:
-                logger.info(f"Adding categorical filter for {column}")
-                user_cat_input = right.multiselect(
-                    f"Values for {column}",
-                    df[column].unique(),
-                    default=list(df[column].unique()),
-                )
-                df = df[df[column].isin(user_cat_input)]
-            elif is_numeric_dtype(df[column]):
-                logger.info(f"Adding numeric filter for {column}")
-                _min = float(df[column].min())
-                _max = float(df[column].max())
-                step = (_max - _min) / 100
-                user_num_input = right.slider(
-                    f"Values for {column}",
-                    min_value=_min,
-                    max_value=_max,
-                    value=(_min, _max),
-                    step=step,
-                )
-                df = df[df[column].between(*user_num_input)]
-            elif is_datetime64_any_dtype(df[column]):
-                logger.info(f"Adding datetime filter for {column}")
-                user_date_input = right.date_input(
-                    f"Values for {column}",
-                    value=(
-                        df[column].min(),
-                        df[column].max(),
-                    ),
-                )
-                if len(user_date_input) == 2:
-                    user_date_input = tuple(map(pd.to_datetime, user_date_input))
-                    start_date, end_date = user_date_input
-                    df = df.loc[df[column].between(start_date, end_date)]
-            else:
-                logger.info(f"Adding regex filter for {column}")
-                user_text_input = right.text_input(
-                    f"Substring or regex in {column}",
-                )
-                if user_text_input:
-                    df = df[df[column].astype(str).str.contains(user_text_input)]
-
-    return df
-
 st.set_page_config(page_title="Transport Analysis", page_icon="📄", layout="centered")
 
 # Streamlit app layout
 with st.sidebar:
     selected = option_menu(
     menu_title = "Transport Analysis",
-    options = ["Potential Carriers","Quotes", "Time Delay Analysis"],
-    icons = ["truck","receipt", "clock-history"],
+    options = ["Time Delay Analysis","Quotes",],
+    icons = ["clock-history","receipt"],
     menu_icon = "truck-front-fill",
     default_index = 0,
     orientation = "horizontal",
 )
 
-if selected == "Potential Carriers":
-    st.title("Get Potential Carriers")
+if selected == "Time Delay Analysis":
+    st.title("Time Delay Analysis")
 
     try: 
         to = st.text_input("To ZIP", key="to", placeholder="Enter To ZIP")
@@ -283,10 +199,35 @@ if selected == "Potential Carriers":
         if st.button("Get Carriers", key="get_carriers"):
             with st.spinner('Getting Carriers...'):
                 if flag:
-                    carriers = get_carriers(from_, to)
+                    carriers = get_carriers(to, from_)
                     carrier_df = carriers.head(int(num))
                     st.success(f"{len(carrier_df)} Carriers Retrived", icon="✅")
-                    st.dataframe(filter_dataframe(carrier_df))
+                    st.dataframe(carrier_df)
+                    c1, c2= st.columns(2)
+                    c3, c4= st.columns(2)
+
+                    with st.container():
+                        c1.subheader("No Delay Ratio")
+                        c2.subheader("Time Difference mean")
+
+                    with st.container():
+                        c3.subheader("Time Difference Standard Deviation")
+                        c4.subheader("Final Amount mean")
+                        
+                    with c1:
+                        st.bar_chart(data=carrier_df, y="No Delay Ratio" , x="Carrier")
+                    
+                    with c2:
+
+                        st.bar_chart(data=carrier_df, y="Time Difference mean" , x="Carrier")
+                    
+                    with c3:
+                        st.bar_chart(data=carrier_df, y="Time Difference custom_std" , x="Carrier")
+                    
+                    with c4:
+                        st.bar_chart(data=carrier_df, y="Final Amount mean" , x="Carrier")
+                 
+            
                 else:
                     st.warning("Please enter all fields", icon="⚠️")
 
@@ -301,9 +242,6 @@ elif selected == "Quotes":
     df_placeholder = st.warning("Data Loading", icon="ℹ")
 
     df_quotes = create_quote_db()
-    df_placeholder.dataframe(filter_dataframe(df_quotes))
+    df_placeholder.dataframe(df_quotes)
 
-elif selected == "Time Delay Analysis":
-    st.title("Time Delay Analysis")
-    
 
