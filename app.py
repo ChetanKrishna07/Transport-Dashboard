@@ -19,10 +19,11 @@ from pandas.api.types import (
 )
 import streamlit_option_menu
 from streamlit_option_menu import option_menu
+from pandasql import sqldf
 
 
 # Set up logging to console and logs.log
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh = logging.FileHandler('logs.log')
@@ -185,11 +186,20 @@ def create_quote_db():
     st.session_state.quotes_data = pd.DataFrame(quotes)
     return pd.DataFrame(quotes)
 
+def execute_sql(sql):
+    try:
+        return sqldf(sql, globals())
+    except Exception as e:
+        logger.error("Error occured while executing sql")
+        logger.error(e)
+        return None
+
 # UI 
 
 def apply_filters(df):
     
     if st.session_state.get("enable_filtering", False):
+        logger.info("Filtering Enabled")
         filtered_df = df.copy()
         for column in df.columns:
             if st.sidebar.checkbox(f"Enable {column} Filtering", key=f"enable_{column}_filtering"):
@@ -333,6 +343,23 @@ if selected == "Time Delay Analysis":
             else:
                 st.warning("Please enter all fields", icon="⚠️")
 
+        if 'carrier_data' in st.session_state:
+            
+            query = st.text_input("Query", key="query", placeholder="Enter SQL Query")
+            st.text('Note: Refer to the table as carrier_df')
+            st.text('Eg: select Carrier, FromZIP, ToZIP from carrier_df where `Final Amount mean` > 100')
+            if st.button("Execute Query", key="clear"):
+                if query:
+                    with st.spinner('Executing Query...'):
+                        result = execute_sql(query)
+                        if result is None:
+                            st.error("Invalid Query")
+                        else:
+                            st.success(f"Query Executed Successfully", icon="✅")
+                            st.dataframe(result)
+                else:
+                    st.warning("Please enter a query", icon="⚠️")
+        
     except Exception as e:
         logger.error("Error occured while getting carriers")
         logger.error(e)
@@ -349,5 +376,19 @@ elif selected == "Quotes":
         else:
             df_quotes = apply_filters(st.session_state.quotes_data)
             df_placeholder = st.dataframe(df_quotes)
+            query = st.text_input("Query", key="query", placeholder="Enter SQL Query")
+            st.text('Note: Refer to the table as df_quotes')
+            st.text('Eg: select * from df_quotes where `Qoute Amount` > 100')
+            if st.button("Execute Query", key="clear"):
+                if query:
+                    with st.spinner('Executing Query...'):
+                        result = execute_sql(query)
+                        if result is None:
+                            st.error("Invalid Query")
+                        else:
+                            st.success(f"Query Executed Successfully", icon="✅")
+                            st.dataframe(result)
+                else:
+                    st.warning("Please enter a query", icon="⚠️")
     with right:
         st.text_area("Note", "Additional Insights About the data`", key="note", height=210)

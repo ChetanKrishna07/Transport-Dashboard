@@ -7,3 +7,4 @@ gspread_dataframe
 pyvirtualdisplay
 streamlit
 streamlit_option_menu
+pandasql
