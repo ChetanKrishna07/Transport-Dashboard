@@ -110,8 +110,8 @@ def custom_std(series):
     # Return 0 if there's only one data point, else calculate std
     return series.std() if len(series) > 1 else 0
 
-def count_trips(df, carrier):
-    return len(df[df["Carrier"] == carrier])
+def count_trips(df, carrier, FromZIP, ToZIP):
+    return len(df[(df["Carrier"] == carrier) & (df["ToZIP"] == ToZIP) & (df["FromZIP"] == FromZIP)])
 
 def count_unique_routes(df, carrier):
     
@@ -128,7 +128,7 @@ def TransportAnalysis(df):
     # Convert 'Time Difference' to numeric and handle NaN values
     df['Time Difference'] = pd.to_numeric(df['Time Difference'], errors='coerce')
     
-    df["Total Trips"] = df["Carrier"].apply(lambda x:count_trips(df, x))
+    df["Total Trips"] = df[["Carrier", "FromZIP", "ToZIP"]].apply(lambda x:count_trips(df, x["Carrier"], x["FromZIP"], x["ToZIP"]), axis=1)
     df["Unique Routes"] = df["Carrier"].apply(lambda x:count_unique_routes(df, x))
     # Group the data
     grouped = df.groupby(['Carrier', 'FromZIP', 'ToZIP'])
@@ -149,11 +149,13 @@ def no_delay_ratio(df, carrier, FromZIP, ToZIP):
 def get_carriers(FromZIP, ToZIP):
     logger.info(f"Getting Carriers from {FromZIP} to {ToZIP}")
     df = get_data()
+    total_unique_combinations = len(df.groupby(['FromZIP', 'ToZIP']))
     if df is None:
         return pd.DataFrame({})
     final_data = TransportAnalysis(df)
     final_data = final_data[(final_data['FromZIP'] == FromZIP) & (final_data['ToZIP'] == ToZIP)].sort_values('Final Amount mean')
     final_data["No Delay Ratio"] = final_data["Carrier"].apply(lambda carrier : no_delay_ratio(final_data, carrier, FromZIP, ToZIP))
+    final_data["Trips / Total Unique Routes"] = final_data["Total Trips max"] / total_unique_combinations
     st.session_state.carrier_data = final_data.sort_values("No Delay Ratio", ascending=False)
     return final_data.sort_values("No Delay Ratio", ascending=False)
 
@@ -255,6 +257,8 @@ if selected == "Time Delay Analysis":
         c1, c2= st.columns(2)
         c3, c4= st.columns(2)
         c5, c6= st.columns(2)
+        c7, c8 = st.columns(2)
+        
 
         
         if 'carrier_data' not in st.session_state:
@@ -282,6 +286,8 @@ if selected == "Time Delay Analysis":
             with c6:
                 h6 = st.empty()
                 p6 = st.empty()
+            with c7:
+                st.empty()
         else:   
             carrier_df = apply_filters(st.session_state.carrier_data)
             carrier_place = st.dataframe(carrier_df)
@@ -308,6 +314,10 @@ if selected == "Time Delay Analysis":
             with c6:
                 h6 = st.subheader("Unique Routes")
                 p6 = st.bar_chart(data=carrier_df, y="Unique Routes max" , x="Carrier")
+            
+            with c7:
+                h6 = st.subheader("Trips / Total Unique Routes")
+                p6 = st.bar_chart(data=carrier_df, y="Trips / Total Unique Routes" , x="Carrier")
             
         if st.button("Get Carriers", key="get_carriers"):
             if from_ and to and num:
@@ -340,6 +350,10 @@ if selected == "Time Delay Analysis":
                     with c6:
                         h6.subheader("Unique Routes")
                         p6.bar_chart(data=carrier_df, y="Unique Routes max" , x="Carrier")
+                        
+                    with c7:
+                        h6.subheader("Trips / Total Unique Routes")
+                        p6.bar_chart(data=carrier_df, y="Trips / Total Unique Routes" , x="Carrier")
             else:
                 st.warning("Please enter all fields", icon="⚠️")
 
@@ -376,7 +390,6 @@ elif selected == "Quotes":
         else:
             df_quotes = apply_filters(st.session_state.quotes_data)
             df_placeholder = st.dataframe(df_quotes)
-        
         query = st.text_input("Query", key="query", placeholder="Enter SQL Query")
         st.text('Note: Refer to the table as df_quotes')
         st.text('Eg: select * from df_quotes where `Qoute Amount` > 100')
