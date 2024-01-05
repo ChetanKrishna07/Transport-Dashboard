@@ -376,19 +376,21 @@ elif selected == "Quotes":
         else:
             df_quotes = apply_filters(st.session_state.quotes_data)
             df_placeholder = st.dataframe(df_quotes)
-            query = st.text_input("Query", key="query", placeholder="Enter SQL Query")
-            st.text('Note: Refer to the table as df_quotes')
-            st.text('Eg: select * from df_quotes where `Qoute Amount` > 100')
-            if st.button("Execute Query", key="clear"):
-                if query:
-                    with st.spinner('Executing Query...'):
-                        result = execute_sql(query)
-                        if result is None:
-                            st.error("Invalid Query")
-                        else:
-                            st.success(f"Query Executed Successfully", icon="✅")
-                            st.dataframe(result)
-                else:
-                    st.warning("Please enter a query", icon="⚠️")
+        
+        query = st.text_input("Query", key="query", placeholder="Enter SQL Query")
+        st.text('Note: Refer to the table as df_quotes')
+        st.text('Eg: select * from df_quotes where `Qoute Amount` > 100')
+    
+        if st.button("Execute Query", key="clear"):
+            if query:
+                with st.spinner('Executing Query...'):
+                    result = execute_sql(query)
+                    if result is None:
+                        st.error("Invalid Query")
+                    else:
+                        st.success(f"Query Executed Successfully", icon="✅")
+                        st.dataframe(result)
+            else:
+                st.warning("Please enter a query", icon="⚠️")
     with right:
         st.text_area("Note", "Additional Insights About the data`", key="note", height=210)
